@@ -79,7 +79,7 @@ describe('Room Controller Unit Tests', () => {
             });
 
             await roomController.getRoomById(req, res, next);
-            expect(res.status).toHaveBeenCalledWith(404);
+            expect(next).toHaveBeenCalledWith(expect.any(Error));
         });
         
         it('should handle invalid ID format', async () => {

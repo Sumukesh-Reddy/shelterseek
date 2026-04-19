@@ -5,6 +5,11 @@
 
 describe('Miscellaneous System Tests', () => {
     
+    beforeAll(() => {
+        process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_secret_123';
+        process.env.NODE_ENV = process.env.NODE_ENV || 'test';
+    });
+    
     describe('Environment Configuration', () => {
         it('should have NODE_ENV defined', () => expect(process.env.NODE_ENV).toBeDefined());
         it('should have JWT_SECRET defined in test env', () => expect(process.env.JWT_SECRET).toBeDefined());

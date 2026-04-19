@@ -13,7 +13,7 @@ describe('Data Validation Unit Tests', () => {
 
     // Password strength logic
     const validatePassword = (password) => {
-        return password && password.length >= 8;
+        return !!(password && password.length >= 8);
     };
 
     // Room price logic

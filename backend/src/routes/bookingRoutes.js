@@ -189,4 +189,14 @@ router.get('/traveler/:email',
   bookingController.getBookingsByTravelerEmail
 );
 
+router.get('/:id',
+  authenticateToken,
+  bookingController.getBookingById
+);
+
+router.patch('/:id/status',
+  authenticateToken,
+  bookingController.updateBookingStatus
+);
+
 module.exports = router;

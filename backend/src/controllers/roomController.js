@@ -69,9 +69,37 @@ exports.getAllRooms = catchAsync(async (req, res) => {
     }
   }
 
+  // SEARCH FILTERS
+  const { location, minPrice, maxPrice, roomType, propertyType, amenities } = req.query;
+
+  if (location) {
+    query.location = { $regex: location, $options: 'i' };
+  }
+
+  if (minPrice || maxPrice) {
+    query.price = {};
+    if (minPrice) query.price.$gte = Number(minPrice);
+    if (maxPrice) query.price.$lte = Number(maxPrice);
+  }
+
+  if (roomType) query.roomType = roomType;
+  if (propertyType) query.propertyType = propertyType;
+  
+  if (amenities) {
+    const amenitiesList = Array.isArray(amenities) ? amenities : amenities.split(',');
+    query.amenities = { $all: amenitiesList };
+  }
+
+  // SORTING
+  let sortOption = { createdAt: -1 };
+  if (req.query.sort === 'price_asc') sortOption = 'price';
+  if (req.query.sort === 'price_desc') sortOption = '-price';
+  if (req.query.sort === 'newest') sortOption = '-createdAt';
+  if (req.query.sort === 'oldest') sortOption = 'createdAt';
+
   // Optimize: Use projection to fetch only needed fields
   const rooms = await Room.find(query)
-    .sort({ createdAt: -1 })
+    .sort(sortOption)
     .skip(skip)
     .limit(limit)
     .lean();
@@ -159,15 +187,15 @@ exports.getAllRooms = catchAsync(async (req, res) => {
 
 // Get room by ID
 exports.getRoomById = catchAsync(async (req, res, next) => {
-  const room = await Room.findById(req.params.id);
+  const room = await Room.findById(req.params.id).lean();
   
   if (!room) {
     return next(new AppError('Room not found', 404));
   }
 
   res.json({
-    success: true,
-    data: { room }
+    status: 'success',
+    data: room
   });
 });
 

@@ -29,7 +29,7 @@ describe('Auth Utilities Unit Tests', () => {
 
   describe('Credential Validation', () => {
     const validateCredentials = (email, password) => {
-        return email && email.includes('@') && password && password.length >= 6;
+        return !!(email && email.includes('@') && password && password.length >= 6);
     };
 
     it('should validate correct credentials', () => expect(validateCredentials('test@test.com', '123456')).toBe(true));

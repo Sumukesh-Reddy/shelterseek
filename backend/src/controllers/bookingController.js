@@ -459,3 +459,47 @@ exports.getHostAnalytics = catchAsync(async (req, res, next) => {
     }
   });
 });
+
+// Get single booking by ID
+exports.getBookingById = catchAsync(async (req, res, next) => {
+  const booking = await Booking.findById(req.params.id).lean();
+
+  if (!booking) {
+    return next(new AppError('Booking not found', 404));
+  }
+
+  // Authorization check: Only traveler, host, or admin can view
+  const isTraveler = booking.travelerId?.toString() === req.user._id.toString();
+  const isHost = booking.hostEmail === req.user.email;
+  const isAdmin = req.user.accountType === 'admin';
+
+  if (!isTraveler && !isHost && !isAdmin) {
+    return next(new AppError('Unauthorized to view this booking', 403));
+  }
+
+  res.json({
+    success: true,
+    booking
+  });
+});
+
+// Update booking status
+exports.updateBookingStatus = catchAsync(async (req, res, next) => {
+  const { status } = req.body;
+  
+  if (!status) {
+    return next(new AppError('Status is required', 400));
+  }
+
+  const booking = await Booking.findByIdAndUpdate(
+    req.params.id,
+    { bookingStatus: status },
+    { new: true, runValidators: true }
+  );
+
+  res.json({
+    success: true,
+    message: 'Booking status updated successfully',
+    booking
+  });
+});
