@@ -86,7 +86,36 @@ jobs:
 
     - name: Deploy Backend to Render
       run: |
-        curl -f -X POST "https://api.render.com/deploy/srv-${{ secrets.RENDER_SERVICE_ID }}?key=${{ secrets.RENDER_API_KEY }}"
+        # Extract the service ID, removing the 'srv-' prefix if it exists to avoid duplication (srv-srv-)
+        SERVICE_ID="${{ secrets.RENDER_SERVICE_ID }}"
+        SERVICE_ID="${SERVICE_ID#srv-}"
+        
+        echo "Attempting to trigger deployment for srv-$SERVICE_ID..."
+        
+        # 1. Try the Render Deploy Hook first
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "https://api.render.com/deploy/srv-${SERVICE_ID}?key=${{ secrets.RENDER_API_KEY }}")
+        
+        if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+          echo "Deployment triggered successfully via Deploy Hook."
+          exit 0
+        fi
+        
+        echo "Deploy Hook failed with HTTP $HTTP_CODE. Checking if RENDER_API_KEY is a REST API token..."
+        
+        # 2. If it failed, try the Render REST API using the key as an Authorization token
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "https://api.render.com/v1/services/srv-${SERVICE_ID}/deploys" \
+          -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+          -H "Content-Type: application/json" \
+          -d '{"clearCache": "do_not_clear"}')
+          
+        if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+          echo "Deployment triggered successfully via REST API."
+          exit 0
+        fi
+        
+        echo "Deployment failed via REST API as well with HTTP $HTTP_CODE."
+        echo "Please check that your GitHub secrets for RENDER_SERVICE_ID and RENDER_API_KEY are correct."
+        exit 1
       # Note: Vercel might also be used for backend if configured, but Render is preferred for Socket.io
       
     - name: Deploy Frontend to Vercel
