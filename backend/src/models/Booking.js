@@ -67,9 +67,22 @@ let Booking;
 if (global.paymentConnection) {
   Booking = global.paymentConnection.model('Booking', bookingSchema);
 } else {
-  // Fallback connection
-  const connection = mongoose.createConnection(process.env.PAYMENT_DB_URI);
-  Booking = connection.model('Booking', bookingSchema);
+  if (process.env.NODE_ENV === 'test' || !process.env.PAYMENT_DB_URI) {
+    if (process.env.NODE_ENV !== 'test') {
+      console.warn('⚠️ PAYMENT_DB_URI not found, Booking model might not work correctly');
+    }
+    try {
+      Booking = mongoose.model('Booking', bookingSchema);
+    } catch (err) {
+      if (err.name === 'OverwriteModelError') {
+        Booking = mongoose.model('Booking');
+      }
+    }
+  } else {
+    // Fallback connection
+    const connection = mongoose.createConnection(process.env.PAYMENT_DB_URI);
+    Booking = connection.model('Booking', bookingSchema);
+  }
 }
 
 module.exports = Booking;

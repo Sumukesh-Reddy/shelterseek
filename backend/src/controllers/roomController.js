@@ -1,5 +1,5 @@
 const Room = require('../models/Room');
-const { Traveler, Host } = require('../models/User');
+const { Traveler, Host } = require('../models/User/index');
 const Booking = require('../models/Booking');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
