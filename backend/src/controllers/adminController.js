@@ -341,119 +341,111 @@ exports.deleteUser = catchAsync(async (req, res) => {
   res.json({ success: true, message: 'User deleted successfully' });
 });
 
-// Get trends data
+// Get trends data - Optimized with Aggregation
 exports.getTrends = catchAsync(async (req, res) => {
-  const travelers = await Traveler.find({}).lean();
-  
-  const roomStats = {};
-  
-  travelers.forEach((traveler) => {
-    if (traveler.viewedRooms && Array.isArray(traveler.viewedRooms)) {
-      traveler.viewedRooms.forEach(view => {
-        let roomId;
-        if (typeof view === 'string') {
-          roomId = view;
-        } else if (view && typeof view === 'object') {
-          roomId = view.roomId || view._id || view.id;
-        }
-        
-        if (!roomId || typeof roomId !== 'string') return;
-        
-        if (!roomStats[roomId]) {
-          roomStats[roomId] = {
-            roomId,
-            totalViews: 0,
-            totalLikes: 0,
-            uniqueViewers: new Set(),
-            uniqueLikers: new Set()
-          };
-        }
-        
-        roomStats[roomId].totalViews++;
-        if (traveler._id) {
-          roomStats[roomId].uniqueViewers.add(traveler._id.toString());
-        }
-      });
+  // Use aggregation to count views and likes across all travelers
+  const trends = await Traveler.aggregate([
+    {
+      $facet: {
+        views: [
+          { $unwind: "$viewedRooms" },
+          {
+            $group: {
+              _id: { $cond: [{ $type: "$viewedRooms" }, { $ifNull: ["$viewedRooms.roomId", "$viewedRooms"] }, "$viewedRooms"] },
+              totalViews: { $sum: 1 },
+              uniqueViewers: { $addToSet: "$_id" }
+            }
+          }
+        ],
+        likes: [
+          { $unwind: "$likedRooms" },
+          {
+            $group: {
+              _id: "$likedRooms",
+              totalLikes: { $sum: 1 },
+              uniqueLikers: { $addToSet: "$_id" }
+            }
+          }
+        ]
+      }
     }
-    
-    if (traveler.likedRooms && Array.isArray(traveler.likedRooms)) {
-      traveler.likedRooms.forEach(roomId => {
-        if (!roomId || typeof roomId !== 'string') return;
-        
-        if (!roomStats[roomId]) {
-          roomStats[roomId] = {
-            roomId,
-            totalViews: 0,
-            totalLikes: 0,
-            uniqueViewers: new Set(),
-            uniqueLikers: new Set()
-          };
-        }
-        
-        roomStats[roomId].totalLikes++;
-        if (traveler._id) {
-          roomStats[roomId].uniqueLikers.add(traveler._id.toString());
-        }
+  ]);
+
+  const viewStats = trends[0].views;
+  const likeStats = trends[0].likes;
+  
+  const roomMap = new Map();
+
+  viewStats.forEach(v => {
+    if (!v._id) return;
+    const id = v._id.toString();
+    roomMap.set(id, { 
+      roomId: id, 
+      totalViews: v.totalViews, 
+      totalLikes: 0, 
+      uniqueViewers: v.uniqueViewers.length, 
+      uniqueLikers: 0 
+    });
+  });
+
+  likeStats.forEach(l => {
+    if (!l._id) return;
+    const id = l._id.toString();
+    if (roomMap.has(id)) {
+      const existing = roomMap.get(id);
+      existing.totalLikes = l.totalLikes;
+      existing.uniqueLikers = l.uniqueLikers.length;
+    } else {
+      roomMap.set(id, { 
+        roomId: id, 
+        totalViews: 0, 
+        totalLikes: l.totalLikes, 
+        uniqueViewers: 0, 
+        uniqueLikers: l.uniqueLikers.length 
       });
     }
   });
 
-  const trends = Object.values(roomStats).map(stat => ({
-    roomId: stat.roomId,
-    totalViews: stat.totalViews,
-    totalLikes: stat.totalLikes,
-    uniqueViewers: stat.uniqueViewers.size,
-    uniqueLikers: stat.uniqueLikers.size,
-    engagementRate: stat.totalViews > 0 ? 
-      Math.round((stat.totalLikes / stat.totalViews) * 100) : 0
-  }));
+  const finalTrends = Array.from(roomMap.values())
+    .map(t => ({
+      ...t,
+      engagementRate: t.totalViews > 0 ? Math.round((t.totalLikes / t.totalViews) * 100) : 0
+    }))
+    .sort((a, b) => b.totalViews - a.totalViews);
 
-  trends.sort((a, b) => b.totalViews - a.totalViews);
+  const topRoomIds = finalTrends.slice(0, 50).map(t => {
+    try { return new mongoose.Types.ObjectId(t.roomId); } catch { return null; }
+  }).filter(id => id !== null);
 
-  const topRoomIds = trends.slice(0, 50).map(t => t.roomId);
+  const rooms = await Room.find({ _id: { $in: topRoomIds } })
+    .select('title name location price')
+    .lean();
 
-  const rooms = await Room.find({
-    _id: { $in: topRoomIds.map(id => {
-      try {
-        return new mongoose.Types.ObjectId(id);
-      } catch {
-        return null;
-      }
-    }).filter(id => id !== null) }
-  }).select('title name location price').lean();
+  const roomDetailsMap = new Map(rooms.map(r => [r._id.toString(), r]));
 
-  const roomDetailsMap = {};
-  rooms.forEach(room => {
-    roomDetailsMap[room._id.toString()] = {
-      title: room.title || 'Untitled Room',
-      host: room.name || 'Unknown Host',
-      location: room.location || 'Unknown Location',
-      price: room.price || 0
+  const trendsWithDetails = finalTrends.map(trend => {
+    const detail = roomDetailsMap.get(trend.roomId);
+    return {
+      ...trend,
+      roomName: detail?.title || `Room ${trend.roomId.substring(0, 8)}...`,
+      host: detail?.name || 'Unknown',
+      location: detail?.location || 'Unknown',
+      price: detail?.price || 0
     };
   });
 
-  const trendsWithDetails = trends.map(trend => ({
-    ...trend,
-    roomName: roomDetailsMap[trend.roomId]?.title || `Room ${trend.roomId.substring(0, 8)}...`,
-    host: roomDetailsMap[trend.roomId]?.host || 'Unknown',
-    location: roomDetailsMap[trend.roomId]?.location || 'Unknown',
-    price: roomDetailsMap[trend.roomId]?.price || 0
-  }));
-
   const summary = {
-    totalRooms: trends.length,
-    totalViews: trends.reduce((sum, t) => sum + t.totalViews, 0),
-    totalLikes: trends.reduce((sum, t) => sum + t.totalLikes, 0),
-    totalUniqueViewers: new Set(trends.flatMap(t => t.uniqueViewers)).size,
-    totalUniqueLikers: new Set(trends.flatMap(t => t.uniqueLikers)).size,
-    avgEngagementRate: trends.length > 0 ? 
-      Math.round(trends.reduce((sum, t) => sum + t.engagementRate, 0) / trends.length) : 0
+    totalRooms: finalTrends.length,
+    totalViews: finalTrends.reduce((sum, t) => sum + t.totalViews, 0),
+    totalLikes: finalTrends.reduce((sum, t) => sum + t.totalLikes, 0),
+    avgEngagementRate: finalTrends.length > 0 ? 
+      Math.round(finalTrends.reduce((sum, t) => sum + t.engagementRate, 0) / finalTrends.length) : 0
   };
 
   res.json({
     success: true,
     trends: trendsWithDetails,
     summary,
-    count: trends.length
+    count: finalTrends.length
   });
-});
+});

@@ -6,7 +6,7 @@ const catchAsync = require('../utils/catchAsync');
 const jwt = require('jsonwebtoken');
 const { replicateToTravelerDB } = require('../services/replicationService');
 
-// Get all rooms with filtering
+// Get all rooms with filtering and pagination
 exports.getAllRooms = catchAsync(async (req, res) => {
   let userId = null;
   const token = req.headers['authorization']?.split(' ')[1];
@@ -14,12 +14,18 @@ exports.getAllRooms = catchAsync(async (req, res) => {
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'myjwtsecret');
-      const user = await Traveler.findById(decoded.id) || await Host.findById(decoded.id);
+      const user = await Traveler.findById(decoded.id).select('_id accountType email').lean() || 
+                   await Host.findById(decoded.id).select('_id accountType email').lean();
       if (user) userId = user._id.toString();
     } catch (err) {
       console.log('Invalid token:', err.message);
     }
   }
+
+  // Pagination
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 20;
+  const skip = (page - 1) * limit;
 
   let query = {
     $or: [{ status: /verified/i }, { status: /approved/i }]
@@ -28,19 +34,9 @@ exports.getAllRooms = catchAsync(async (req, res) => {
   if (!userId) {
     query.booking = { $ne: true };
   } else {
-    query = {
-      $and: [
-        { $or: [{ status: /verified/i }, { status: /approved/i }] },
-        {
-          $or: [
-            { booking: { $ne: true } },
-            { bookedBy: userId }
-          ]
-        }
-      ]
-    };
-    
-    const user = await Traveler.findById(userId) || await Host.findById(userId);
+    const user = await Traveler.findById(userId).select('email accountType').lean() || 
+                 await Host.findById(userId).select('email accountType').lean();
+                 
     if (user && user.accountType === 'host') {
       query = {
         $or: [
@@ -58,12 +54,39 @@ exports.getAllRooms = catchAsync(async (req, res) => {
           }
         ]
       };
+    } else {
+      query = {
+        $and: [
+          { $or: [{ status: /verified/i }, { status: /approved/i }] },
+          {
+            $or: [
+              { booking: { $ne: true } },
+              { bookedBy: userId }
+            ]
+          }
+        ]
+      };
     }
   }
 
-  const rooms = await Room.find(query).lean();
+  // Optimize: Use projection to fetch only needed fields
+  const rooms = await Room.find(query)
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
 
-  const processed = await Promise.all(rooms.map(async (room) => {
+  const total = await Room.countDocuments(query);
+
+  // OPTIMIZATION: Batch fetch hosts to avoid N+1 queries
+  const hostNames = [...new Set(rooms.map(r => r.name).filter(Boolean))];
+  const hosts = await Host.find({ name: { $in: hostNames } })
+    .select('name email profilePhoto')
+    .lean();
+
+  const hostMap = new Map(hosts.map(h => [h.name, h]));
+
+  const processed = rooms.map((room) => {
     const images = room.images?.map(img => {
       if (typeof img === 'object' && img.$oid) {
         return `/api/images/${img.$oid}`;
@@ -80,19 +103,11 @@ exports.getAllRooms = catchAsync(async (req, res) => {
       return date instanceof Date ? date.toISOString().split('T')[0] : date;
     }) || [];
 
-    // Get host info
-    let hostEmail = room.email || '';
+    // Get host info from map (Optimized)
+    const hostInfo = hostMap.get(room.name);
+    let hostEmail = room.email || hostInfo?.email || '';
+    let hostImage = room.hostImage || hostInfo?.profilePhoto || null;
     let hostGender = room.hostGender || '';
-    let hostImage = room.hostImage || null;
-    
-    if (!hostEmail && room.name) {
-      const hostByName = await Host.findOne({ name: room.name })
-        .select('email profilePhoto').lean();
-      if (hostByName) {
-        hostEmail = hostEmail || hostByName.email || '';
-        hostImage = hostImage || hostByName.profilePhoto || null;
-      }
-    }
 
     return {
       _id: room._id?.toString(),
@@ -130,11 +145,14 @@ exports.getAllRooms = catchAsync(async (req, res) => {
       hostImage,
       yearsWithUs: room.yearsWithUs || 0
     };
-  }));
+  });
 
   res.json({
     status: 'success',
     count: processed.length,
+    total,
+    page,
+    pages: Math.ceil(total / limit),
     data: processed
   });
 });

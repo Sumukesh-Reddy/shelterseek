@@ -300,122 +300,115 @@ exports.getBookingSummary = catchAsync(async (req, res) => {
   });
 });
 
-// Get booking stats
+// Get booking stats - Optimized with Aggregation
 exports.getBookingStats = catchAsync(async (req, res) => {
-  const bookings = await Booking.find({
-    bookingStatus: { $in: ['confirmed', 'checked_in', 'completed'] }
-  }).lean();
-
   const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   
-  const startOfMonth = new Date(currentYear, currentMonth, 1);
-  const endOfMonth = new Date(currentYear, currentMonth + 1, 0);
-  endOfMonth.setHours(23, 59, 59, 999);
-
-  const startOfWeek = new Date(now);
+  // Weekly start (Monday)
   const day = now.getDay();
-  // Get Monday of current week
   const diffToMonday = day === 0 ? -6 : 1 - day;
+  const startOfWeek = new Date(now);
   startOfWeek.setDate(now.getDate() + diffToMonday);
   startOfWeek.setHours(0, 0, 0, 0);
-  
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6);
-  endOfWeek.setHours(23, 59, 59, 999);
 
-  let total = bookings.length; // Use array length as source of truth for total
-  let thisMonth = 0;
-  let thisWeek = 0;
-
-  bookings.forEach(b => {
-    // Robust date check: prefer bookedAt, then createdAt, then checkIn
-    const bookingDate = b.bookedAt || b.createdAt || b.checkIn || b.paymentDetails?.paymentDate;
-    if (!bookingDate) return;
-    
-    const bookingDateObj = new Date(bookingDate);
-    if (isNaN(bookingDateObj)) return;
-
-    if (bookingDateObj >= startOfMonth && bookingDateObj <= endOfMonth) {
-      thisMonth++;
+  const stats = await Booking.aggregate([
+    {
+      $match: {
+        bookingStatus: { $in: ['confirmed', 'checked_in', 'completed'] }
+      }
+    },
+    {
+      $facet: {
+        total: [{ $count: "count" }],
+        thisMonth: [
+          { $match: { bookedAt: { $gte: startOfMonth } } },
+          { $count: "count" }
+        ],
+        thisWeek: [
+          { $match: { bookedAt: { $gte: startOfWeek } } },
+          { $count: "count" }
+        ]
+      }
     }
+  ]);
 
-    if (bookingDateObj >= startOfWeek && bookingDateObj <= endOfWeek) {
-      thisWeek++;
-    }
-  });
+  const result = {
+    total: stats[0].total[0]?.count || 0,
+    thisMonth: stats[0].thisMonth[0]?.count || 0,
+    thisWeek: stats[0].thisWeek[0]?.count || 0
+  };
 
   res.json({ 
     success: true,
-    total, 
-    thisMonth, 
-    thisWeek,
-    count: bookings.length,
+    ...result,
+    count: result.total,
     dateRange: {
       weekStart: startOfWeek.toISOString(),
-      weekEnd: endOfWeek.toISOString(),
       monthStart: startOfMonth.toISOString(),
-      monthEnd: endOfMonth.toISOString(),
       currentDate: now.toISOString()
     }
   });
 });
 
-// Get revenue stats
+// Get revenue stats - Optimized with Aggregation
 exports.getRevenueStats = catchAsync(async (req, res) => {
-  const bookings = await Booking.find({
-    paymentStatus: 'completed',
-    bookingStatus: { $in: ['confirmed', 'checked_in', 'completed'] }
-  }).lean();
-
-  const validBookings = bookings.filter(b => {
-    const cost = b.totalCost || b.amount;
-    const paymentDate = b.paymentDate || b.createdAt || b.checkIn;
-    return !isNaN(Number(cost)) && Number(cost) > 0 && paymentDate;
-  });
-
-  const getBookingDate = (booking) => {
-    return new Date(booking.paymentDate || booking.createdAt || booking.checkIn);
-  };
-
-  const totalRevenue = validBookings.reduce((sum, b) => {
-    const cost = b.totalCost || b.amount || 0;
-    return sum + Number(cost);
-  }, 0);
-
   const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
-  
-  const startOfMonth = new Date(currentYear, currentMonth, 1);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfWeek = new Date(now);
   startOfWeek.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1));
   startOfWeek.setHours(0, 0, 0, 0);
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
 
-  const thisMonthRevenue = validBookings
-    .filter(b => getBookingDate(b) >= startOfMonth && getBookingDate(b) <= now)
-    .reduce((sum, b) => sum + Number(b.totalCost || b.amount || 0), 0);
+  const stats = await Booking.aggregate([
+    {
+      $match: {
+        paymentStatus: 'completed',
+        bookingStatus: { $in: ['confirmed', 'checked_in', 'completed'] }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        totalRevenue: { $sum: "$totalCost" },
+        count: { $sum: 1 },
+        thisMonthRevenue: {
+          $sum: {
+            $cond: [{ $gte: ["$bookedAt", startOfMonth] }, "$totalCost", 0]
+          }
+        },
+        thisWeekRevenue: {
+          $sum: {
+            $cond: [{ $gte: ["$bookedAt", startOfWeek] }, "$totalCost", 0]
+          }
+        },
+        todayRevenue: {
+          $sum: {
+            $cond: [{ $gte: ["$bookedAt", startOfToday] }, "$totalCost", 0]
+          }
+        }
+      }
+    }
+  ]);
 
-  const thisWeekRevenue = validBookings
-    .filter(b => getBookingDate(b) >= startOfWeek && getBookingDate(b) <= now)
-    .reduce((sum, b) => sum + Number(b.totalCost || b.amount || 0), 0);
-
-  const todayRevenue = validBookings
-    .filter(b => getBookingDate(b) >= startOfToday && getBookingDate(b) <= now)
-    .reduce((sum, b) => sum + Number(b.totalCost || b.amount || 0), 0);
+  const result = stats[0] || {
+    totalRevenue: 0,
+    thisMonthRevenue: 0,
+    thisWeekRevenue: 0,
+    todayRevenue: 0,
+    count: 0
+  };
 
   res.json({ 
     success: true,
-    totalRevenue, 
-    thisMonthRevenue, 
-    thisWeekRevenue,
-    todayRevenue,
+    totalRevenue: result.totalRevenue, 
+    thisMonthRevenue: result.thisMonthRevenue, 
+    thisWeekRevenue: result.thisWeekRevenue,
+    todayRevenue: result.todayRevenue,
     currency: 'INR',
-    bookingCount: validBookings.length,
-    averageBookingValue: validBookings.length > 0 ? totalRevenue / validBookings.length : 0
+    bookingCount: result.count,
+    averageBookingValue: result.count > 0 ? result.totalRevenue / result.count : 0
   });
 });
 

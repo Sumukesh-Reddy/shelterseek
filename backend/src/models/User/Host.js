@@ -58,6 +58,13 @@ const hostSchema = new mongoose.Schema({
   hostBookings: [bookingSubSchema]
 }, { collection: 'LoginData' });
 
+// DATABASE OPTIMIZATION: Indexing
+hostSchema.index({ name: 'text', email: 'text' }, { weights: { name: 10, email: 5 } });
+hostSchema.index({ email: 1 });
+hostSchema.index({ accountType: 1, createdAt: -1 });
+hostSchema.index({ googleId: 1 }, { sparse: true });
+hostSchema.index({ resetToken: 1 }, { sparse: true });
+
 // Hash password middleware
 hostSchema.pre('save', async function(next) {
   if (!this.isModified('password') || !this.password) return next();

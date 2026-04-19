@@ -145,7 +145,7 @@ app.use('/auth/manager', managerRoutes);
 app.use("/api/finance", financeRoutes);
 app.use("/api/payment", paymentRoutes);
 
-// Health check
+// Health check and Cache management
 app.get('/health', async (req, res) => {
   const { redisClient } = require('./middleware/cacheMiddleware');
   const redisStatus = redisClient && redisClient.isReady ? 'Connected' : 'Disconnected';
@@ -158,6 +158,20 @@ app.get('/health', async (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: `${Math.floor(process.uptime())}s`
   });
+});
+
+app.get('/api/cache/flush', async (req, res) => {
+  const { redisClient } = require('./middleware/cacheMiddleware');
+  if (!redisClient || !redisClient.isReady) {
+    return res.status(500).json({ success: false, message: 'Redis not available' });
+  }
+  
+  try {
+    await redisClient.flushAll();
+    res.json({ success: true, message: 'Cache cleared successfully! Next request will be slow (MongoDB).' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // Test routes

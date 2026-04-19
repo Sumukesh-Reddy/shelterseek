@@ -63,11 +63,32 @@ exports.getNewCustomers = catchAsync(async (req, res) => {
 // Get all users (admin only)
 exports.getAllUsers = catchAsync(async (req, res) => {
   const { accountType } = req.query;
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 20;
+  const skip = (page - 1) * limit;
+
   let filter = {};
   if (accountType) filter.accountType = accountType;
 
-  const travelers = await Traveler.find(filter).select('-password').lean();
-  const hosts = await Host.find(filter).select('-password').lean();
+  // Optimized: Use limit, skip, select and lean
+  const travelersPromise = Traveler.find(filter)
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .select('-password')
+    .lean();
+
+  const hostsPromise = Host.find(filter)
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .select('-password')
+    .lean();
+
+  const [travelers, hosts] = await Promise.all([travelersPromise, hostsPromise]);
+  
+  const travelerTotal = await Traveler.countDocuments(filter);
+  const hostTotal = await Host.countDocuments(filter);
 
   const processedTravelers = travelers.map(t => ({
     ...t,
@@ -81,7 +102,9 @@ exports.getAllUsers = catchAsync(async (req, res) => {
 
   res.json({
     success: true,
-    results: travelers.length + hosts.length,
+    total: travelerTotal + hostTotal,
+    page,
+    pages: Math.ceil((travelerTotal + hostTotal) / limit),
     data: {
       travelers: processedTravelers,
       hosts: processedHosts

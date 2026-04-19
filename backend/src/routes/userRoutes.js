@@ -37,7 +37,7 @@ router.get('/counts', cacheMiddleware(3600), userController.getUserCounts);
  *       200:
  *         description: List of new customers
  */
-router.get('/new-customers', userController.getNewCustomers);  
+router.get('/new-customers', cacheMiddleware(3600), userController.getNewCustomers);  
 
 /**
  * @swagger
@@ -49,7 +49,7 @@ router.get('/new-customers', userController.getNewCustomers);
  *       200:
  *         description: List of hosts
  */
-router.get('/hosts', userController.getHosts);
+router.get('/hosts', cacheMiddleware(1800), userController.getHosts);
 
 // Search users (must be before /:email wildcard)
 router.get('/search', authenticateToken, chatController.searchUsers);
@@ -84,7 +84,7 @@ router.get('/:email', userController.getUserByEmail);
  *       200:
  *         description: List of all users
  */
-router.get('/', authenticateToken, roleMiddleware.adminOnly, userController.getAllUsers);
+router.get('/', authenticateToken, roleMiddleware.adminOnly, cacheMiddleware(300), userController.getAllUsers);
 
 /**
  * @swagger

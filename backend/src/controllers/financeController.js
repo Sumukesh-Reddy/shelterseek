@@ -108,31 +108,36 @@ exports.getSingleUserFinance = async (req, res) => {
 
 exports.getFinanceStats = async (req, res) => {
   try {
+    const stats = await Booking.aggregate([
+      {
+        $match: {
+          paymentStatus: { $in: ["completed", "refunded"] }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: "$totalCost" },
+          totalRefunds: { $sum: "$refundAmount" },
+          totalBookings: { $sum: 1 }
+        }
+      }
+    ]);
 
-    const bookings = await Booking.find({
-      paymentStatus: { $in: ["completed", "refunded"] }
-    });
+    const result = stats[0] || {
+      totalBookings: 0,
+      totalRevenue: 0,
+      totalRefunds: 0
+    };
 
-    const totalRevenue = bookings.reduce(
-      (acc, curr) => acc + curr.totalCost,
-      0
-    );
-
-    const totalRefunds = bookings.reduce(
-      (acc, curr) => acc + curr.refundAmount,
-      0
-    );
-
-    const totalBookings = bookings.length;
-
-    const platformCommission = totalRevenue * 0.10; // example 10%
+    const platformCommission = result.totalRevenue * 0.10;
 
     res.status(200).json({
-      totalBookings,
-      totalRevenue,
-      totalRefunds,
+      totalBookings: result.totalBookings,
+      totalRevenue: result.totalRevenue,
+      totalRefunds: result.totalRefunds,
       platformCommission,
-      netProfit: totalRevenue - totalRefunds
+      netProfit: result.totalRevenue - result.totalRefunds
     });
 
   } catch (error) {
@@ -140,78 +145,75 @@ exports.getFinanceStats = async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 };
+
 exports.getFinanceDashboard = async (req, res) => {
   try {
-    const bookings = await Booking.find({
-      paymentStatus: { $in: ["completed", "refunded"] }
-    });
-
-    const totalRevenue = bookings.reduce(
-      (acc, curr) => acc + curr.totalCost,
-      0
-    );
-
-    const totalRefunds = bookings.reduce(
-      (acc, curr) => acc + curr.refundAmount,
-      0
-    );
-
-    const totalBookings = bookings.length;
-    const netProfit = totalRevenue - totalRefunds;
-
-    const refundRate =
-      totalRevenue === 0
-        ? 0
-        : ((totalRefunds / totalRevenue) * 100).toFixed(2);
-
-    const platformCommission = totalRevenue * 0.1;
-
-    /* ===== Monthly Revenue Chart Data ===== */
-
-    const monthlyRevenue = await Booking.aggregate([
+    const stats = await Booking.aggregate([
       {
-        $group: {
-          _id: { $month: "$bookedAt" },
-          revenue: { $sum: "$totalCost" }
+        $facet: {
+          summary: [
+            {
+              $match: { paymentStatus: { $in: ["completed", "refunded"] } }
+            },
+            {
+              $group: {
+                _id: null,
+                totalRevenue: { $sum: "$totalCost" },
+                totalRefunds: { $sum: "$refundAmount" },
+                totalBookings: { $sum: 1 }
+              }
+            }
+          ],
+          monthlyRevenue: [
+            {
+              $group: {
+                _id: { $month: "$bookedAt" },
+                revenue: { $sum: "$totalCost" }
+              }
+            },
+            { $sort: { "_id": 1 } }
+          ],
+          topUsers: [
+            {
+              $group: {
+                _id: "$travelerId",
+                travelerName: { $first: "$travelerName" },
+                travelerEmail: { $first: "$travelerEmail" },
+                totalRevenue: { $sum: "$totalCost" }
+              }
+            },
+            { $sort: { totalRevenue: -1 } },
+            { $limit: 5 }
+          ]
         }
-      },
-      { $sort: { "_id": 1 } }
+      }
     ]);
 
-    /* ===== Recent Bookings ===== */
+    const summary = stats[0].summary[0] || {
+      totalRevenue: 0,
+      totalRefunds: 0,
+      totalBookings: 0
+    };
+
+    const netProfit = summary.totalRevenue - summary.totalRefunds;
+    const refundRate = summary.totalRevenue === 0 ? 0 : ((summary.totalRefunds / summary.totalRevenue) * 100).toFixed(2);
 
     const recentBookings = await Booking.find()
       .sort({ bookedAt: -1 })
       .limit(5)
-      .select(
-        "bookingId travelerName roomTitle totalCost bookedAt paymentStatus"
-      );
-
-    /* ===== Top 5 Users ===== */
-
-    const topUsers = await Booking.aggregate([
-      {
-        $group: {
-          _id: "$travelerId",
-          travelerName: { $first: "$travelerName" },
-          travelerEmail: { $first: "$travelerEmail" },
-          totalRevenue: { $sum: "$totalCost" }
-        }
-      },
-      { $sort: { totalRevenue: -1 } },
-      { $limit: 5 }
-    ]);
+      .select("bookingId travelerName roomTitle totalCost bookedAt paymentStatus")
+      .lean();
 
     res.json({
-      totalRevenue,
-      totalRefunds,
-      totalBookings,
+      totalRevenue: summary.totalRevenue,
+      totalRefunds: summary.totalRefunds,
+      totalBookings: summary.totalBookings,
       netProfit,
       refundRate,
-      platformCommission,
-      monthlyRevenue,
+      platformCommission: summary.totalRevenue * 0.1,
+      monthlyRevenue: stats[0].monthlyRevenue,
       recentBookings,
-      topUsers
+      topUsers: stats[0].topUsers
     });
   } catch (error) {
     console.error(error);

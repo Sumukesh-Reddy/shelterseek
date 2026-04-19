@@ -2,14 +2,22 @@
 const mongoose = require('mongoose');
 const { GridFSBucket } = require('mongodb');
 
+// DATABASE OPTIMIZATION: Connection pooling and timeouts
+const connectionOptions = {
+  maxPoolSize: 10,
+  minPoolSize: 2,
+  socketTimeoutMS: 45000,
+  serverSelectionTimeoutMS: 5000,
+  heartbeatFrequencyMS: 10000,
+  retryWrites: true,
+  w: 'majority'
+};
+
 const initializeConnections = () => {
   console.log('🔄 Initializing database connections...');
 
   // Host_Admin connection
-  global.hostAdminConnection = mongoose.createConnection(process.env.HOST_ADMIN_URI, {
-    retryWrites: true,
-    w: 'majority'
-  });
+  global.hostAdminConnection = mongoose.createConnection(process.env.HOST_ADMIN_URI, connectionOptions);
 
   global.hostAdminConnection.on('connected', () => {
     console.log('✅ Connected to Host_Admin database');
@@ -34,14 +42,10 @@ const initializeConnections = () => {
           console.log('🔄 Dropping problematic id_1 index from RoomData...');
           await collection.dropIndex('id_1');
           console.log('✅ Successfully dropped id_1 index');
-        } else {
-          console.log('ℹ️ id_1 index does not exist');
         }
       } catch (err) {
-        if (err.message && err.message.includes('index not found')) {
-          console.log('ℹ️ id_1 index not found (expected)');
-        } else {
-          console.warn('⚠️ Note:', err.message);
+        if (!err.message?.includes('index not found')) {
+          console.warn('⚠️ Note during index management:', err.message);
         }
       }
     }, 1500);
@@ -60,10 +64,7 @@ const initializeConnections = () => {
   });
 
   // Admin_Traveler connection
-  global.adminTravelerConnection = mongoose.createConnection(process.env.ADMIN_TRAVELER_URI, {
-    retryWrites: true,
-    w: 'majority'
-  });
+  global.adminTravelerConnection = mongoose.createConnection(process.env.ADMIN_TRAVELER_URI, connectionOptions);
 
   global.adminTravelerConnection.on('connected', () => {
     console.log('✅ Connected to Admin_Traveler database');
@@ -78,10 +79,7 @@ const initializeConnections = () => {
   });
 
   // Payment DB connection
-  global.paymentConnection = mongoose.createConnection(process.env.PAYMENT_DB_URI, {
-    retryWrites: true,
-    w: 'majority'
-  });
+  global.paymentConnection = mongoose.createConnection(process.env.PAYMENT_DB_URI, connectionOptions);
 
   global.paymentConnection.on('connected', () => {
     console.log('✅ Connected to Payment/Booking database');
@@ -98,4 +96,4 @@ const initializeConnections = () => {
   console.log('🔄 All database connection initialization started');
 };
 
-module.exports = { initializeConnections };
+module.exports = { initializeConnections };

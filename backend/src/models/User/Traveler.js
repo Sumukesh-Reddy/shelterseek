@@ -70,6 +70,14 @@ const travelerSchema = new mongoose.Schema({
   bookings: [bookingSubSchema]
 }, { collection: 'LoginData' });
 
+// DATABASE OPTIMIZATION: Indexing
+travelerSchema.index({ name: 'text', email: 'text' }, { weights: { name: 10, email: 5 } });
+travelerSchema.index({ email: 1 });
+travelerSchema.index({ accountType: 1, createdAt: -1 });
+travelerSchema.index({ googleId: 1 }, { sparse: true });
+travelerSchema.index({ resetToken: 1 }, { sparse: true });
+travelerSchema.index({ likedRooms: 1 });
+
 // Hash password middleware
 travelerSchema.pre('save', async function(next) {
   if (!this.isModified('password') || !this.password) return next();

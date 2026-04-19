@@ -271,7 +271,7 @@ exports.getMessages = catchAsync(async (req, res) => {
   });
 });
 
-// Search users for chat
+// Search users for chat - Optimized with Full Text Search
 exports.searchUsers = catchAsync(async (req, res) => {
   const { query } = req.query;
 
@@ -279,41 +279,57 @@ exports.searchUsers = catchAsync(async (req, res) => {
     return res.json({ success: true, users: [] });
   }
 
-  const searchTerm = query.trim().toLowerCase();
-  const isEmailSearch = searchTerm.includes('@');
+  const searchTerm = query.trim();
   
-  const emailRegex = isEmailSearch 
-    ? { $regex: `^${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' }
-    : { $regex: searchTerm, $options: 'i' };
-  
+  // Use Full-Text Search index for high performance
   const [travelers, hosts] = await Promise.all([
-    Traveler.find({
-      _id: { $ne: req.user._id },
-      $or: [
-        { name: { $regex: searchTerm, $options: 'i' } },
-        { email: emailRegex }
-      ]
-    })
+    Traveler.find(
+      { 
+        $text: { $search: searchTerm },
+        _id: { $ne: req.user._id }
+      },
+      { score: { $meta: "textScore" } }
+    )
+    .sort({ score: { $meta: "textScore" } })
     .select('name email profilePhoto online lastSeen accountType')
-    .limit(10)
+    .limit(15)
     .lean(),
 
-    Host.find({
-      _id: { $ne: req.user._id },
-      $or: [
-        { name: { $regex: searchTerm, $options: 'i' } },
-        { email: emailRegex }
-      ]
-    })
+    Host.find(
+      { 
+        $text: { $search: searchTerm },
+        _id: { $ne: req.user._id }
+      },
+      { score: { $meta: "textScore" } }
+    )
+    .sort({ score: { $meta: "textScore" } })
     .select('name email profilePhoto online lastSeen accountType')
-    .limit(10)
+    .limit(15)
     .lean()
   ]);
+
+  // Fallback to regex if no results (for partial matches like "sum" matching "sumukesh")
+  let finalTravelers = travelers;
+  let finalHosts = hosts;
+
+  if (travelers.length === 0 && hosts.length === 0) {
+    const regex = new RegExp(searchTerm, 'i');
+    [finalTravelers, finalHosts] = await Promise.all([
+      Traveler.find({
+        _id: { $ne: req.user._id },
+        $or: [{ name: regex }, { email: regex }]
+      }).select('name email profilePhoto online lastSeen accountType').limit(10).lean(),
+      Host.find({
+        _id: { $ne: req.user._id },
+        $or: [{ name: regex }, { email: regex }]
+      }).select('name email profilePhoto online lastSeen accountType').limit(10).lean()
+    ]);
+  }
 
   const seenIds = new Set();
   const seenEmails = new Set();
   
-  const users = [...travelers, ...hosts]
+  const users = [...finalTravelers, ...finalHosts]
     .map(user => ({
       _id: user._id.toString(),
       name: user.name || 'Unknown User',
@@ -334,15 +350,6 @@ exports.searchUsers = catchAsync(async (req, res) => {
       if (email) seenEmails.add(email);
       
       return true;
-    })
-    .sort((a, b) => {
-      if (isEmailSearch) {
-        const aMatch = (a.email || '').toLowerCase() === searchTerm;
-        const bMatch = (b.email || '').toLowerCase() === searchTerm;
-        if (aMatch && !bMatch) return -1;
-        if (!aMatch && bMatch) return 1;
-      }
-      return 0;
     })
     .slice(0, 20);
 
