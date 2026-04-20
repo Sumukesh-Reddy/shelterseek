@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const { Traveler, Host, Manager } = require('../models/User');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
-const { sendOTPEmail } = require('../services/emailService');
+const { sendOTPEmail, sendPasswordResetEmail } = require('../services/emailService');
 const { logControllerError } = require('../utils/logger');
 
 // OTP store (in production, use Redis)

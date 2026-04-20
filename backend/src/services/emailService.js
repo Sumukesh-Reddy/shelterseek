@@ -268,9 +268,71 @@ const sendManagerWelcomeEmail = async (toEmail, details = {}) => {
   return { success: true, message: 'Welcome email sent' };
 };
 
+const sendPasswordResetEmail = async (toEmail, resetLink) => {
+  const transporter = createTransporter();
+  if (!transporter) {
+    throw new Error('Email not configured');
+  }
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: toEmail,
+    subject: '🔑 Reset Your ShelterSeek Password',
+    html: `
+      <div style="
+          max-width: 480px;
+          margin: auto;
+          padding: 25px;
+          background: #ffffff;
+          border-radius: 12px;
+          font-family: Arial, Helvetica, sans-serif;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+          color: #333;
+          line-height: 1.6;
+      ">
+          <h2 style="
+              text-align: center;
+              color: #d72d6e;
+              margin-bottom: 10px;
+              font-size: 24px;
+          ">
+              🔑 Password Reset Request
+          </h2>
+          <p style="font-size: 15px; margin-bottom: 18px;">
+              Hello,<br><br>
+              We received a request to reset your password. Click the button below to choose a new password:
+          </p>
+          <div style="text-align: center; margin: 30px 0;">
+              <a href="${resetLink}" style="
+                  background-color: #d72d6e;
+                  color: white;
+                  padding: 12px 25px;
+                  text-decoration: none;
+                  border-radius: 8px;
+                  font-weight: bold;
+                  display: inline-block;
+              ">
+                  Reset Password
+              </a>
+          </div>
+          <p style="font-size: 14px; color:#555;">
+              This link will expire in 1 hour.<br>
+              If you didn't request this, you can safely ignore this email.
+          </p>
+          <p style="font-size: 13px; color:#777; margin-top: 25px; text-align: center;">
+              — Team ShelterSeek 💖
+          </p>
+      </div>
+    `
+  };
+
+  await transporter.sendMail(mailOptions);
+};
+
 module.exports = {
   sendOTPEmail,
   sendBookingConfirmationEmail,
   sendTestEmail,
-  sendManagerWelcomeEmail
+  sendManagerWelcomeEmail,
+  sendPasswordResetEmail
 };

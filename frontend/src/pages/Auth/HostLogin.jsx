@@ -164,6 +164,10 @@ const HostLogin = () => {
                 required
               />
 
+              <div className="forgot-password-link">
+                <Link to="/forgot-password">Forgot Password?</Link>
+              </div>
+
               <button className="auth-button" disabled={loading}>
                 {loading ? 'Sending OTP...' : 'Send OTP'}
               </button>
