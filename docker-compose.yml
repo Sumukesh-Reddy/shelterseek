@@ -9,12 +9,15 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - PORT=3001
       - REDIS_URL=redis://redis:6379
       - MONGODB_URI=mongodb://mongodb:27017/shelterseek
     volumes:
+      - ./backend:/app
+      - /app/node_modules
       - backend_uploads:/app/public/uploads
+    command: npm run dev
     depends_on:
       - redis
       - mongodb
@@ -26,6 +29,10 @@ services:
       - "3000:3000"
     environment:
       - REACT_APP_API_URL=http://localhost:3001
+      - WDS_SOCKET_PORT=0
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - backend
 
