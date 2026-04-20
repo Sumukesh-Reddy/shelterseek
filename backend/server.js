@@ -12,13 +12,13 @@ const keepAlive = (url) => {
   let i = 0;
   setInterval(() => {
     i = (i + 1) % 11;
-    console.log(`💓 [Heartbeat] Render Keep-Alive: Count = ${i}`);
+    console.log(` [Heartbeat] Render Keep-Alive: Count = ${i}`);
 
     if (url) {
       https.get(url, (res) => {
-        console.log(`✅ [Keep-Alive] Self-ping status: ${res.statusCode}`);
+        console.log(` [Keep-Alive] Self-ping status: ${res.statusCode}`);
       }).on('error', (err) => {
-        console.error('❌ [Keep-Alive] Self-ping error:', err.message);
+        console.error(' [Keep-Alive] Self-ping error:', err.message);
       });
     }
   }, 3 * 60 * 1000); // 3 minutes (Render sleeps after 15 mins)
@@ -28,7 +28,7 @@ const PORT = process.env.PORT || 3001;
 
 // Handle uncaught exceptions
 process.on("uncaughtException", (err) => {
-  console.error("UNCAUGHT EXCEPTION! 💥 Shutting down...");
+  console.error("UNCAUGHT EXCEPTION!  Shutting down...");
   console.error(err.name, err.message, err.stack);
   process.exit(1);
 });
@@ -40,7 +40,7 @@ mongoose
     useUnifiedTopology: true,
   })
   .then(() => {
-    console.log("✅ Main MongoDB connected");
+    console.log(" Main MongoDB connected");
 
     // Create HTTP server from Express app
     const server = http.createServer(app);
@@ -62,9 +62,9 @@ mongoose
 
     // Start server
     server.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📡 Environment: ${process.env.NODE_ENV || "development"}`);
-      console.log(`⚡ Socket.IO ready at: http://localhost:${PORT}`);
+      console.log(` Server running on port ${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+      console.log(` Socket.IO ready at: http://localhost:${PORT}`);
 
       // Start Keep-Alive to prevent Render sleep (if URL provided)
       keepAlive(process.env.RENDER_EXTERNAL_URL);
@@ -82,7 +82,7 @@ mongoose
 
     // Handle unhandled rejections
     process.on("unhandledRejection", (err) => {
-      console.error("UNHANDLED REJECTION! 💥 Shutting down...");
+      console.error("UNHANDLED REJECTION! Shutting down...");
       console.error(err.name, err.message);
       server.close(() => {
         process.exit(1);
@@ -91,13 +91,13 @@ mongoose
 
     // Handle SIGTERM
     process.on("SIGTERM", () => {
-      console.log("👋 SIGTERM RECEIVED. Shutting down gracefully");
+      console.log(" SIGTERM RECEIVED. Shutting down gracefully");
       server.close(() => {
-        console.log("💤 Process terminated!");
+        console.log(" Process terminated!");
       });
     });
   })
   .catch((err) => {
-    console.error("❌ Main MongoDB connection error:", err);
+    console.error(" Main MongoDB connection error:", err);
     process.exit(1);
   });
