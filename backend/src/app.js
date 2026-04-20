@@ -146,6 +146,16 @@ app.use("/api/finance", financeRoutes);
 app.use("/api/payment", paymentRoutes);
 
 // Health check and Cache management
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Get system health status
+ *     tags: [System]
+ *     responses:
+ *       200:
+ *         description: System status including database and cache
+ */
 app.get('/health', async (req, res) => {
   const { redisClient } = require('./middleware/cacheMiddleware');
   const redisStatus = redisClient && redisClient.isReady ? 'Connected' : 'Disconnected';
@@ -160,6 +170,18 @@ app.get('/health', async (req, res) => {
   });
 });
 
+/**
+ * @swagger
+ * /api/cache/flush:
+ *   get:
+ *     summary: Flush all Redis cache
+ *     tags: [System]
+ *     responses:
+ *       200:
+ *         description: Cache cleared successfully
+ *       500:
+ *         description: Redis not available or error clearing cache
+ */
 app.get('/api/cache/flush', async (req, res) => {
   const { redisClient } = require('./middleware/cacheMiddleware');
   if (!redisClient || !redisClient.isReady) {

@@ -28,9 +28,10 @@ A full-stack accommodation booking platform built with React and Node.js. Shelte
 
 Before you begin, make sure you have the following installed:
 
-- **Node.js** (v14 or higher)
+- **Node.js** (v18 or higher)
 - **npm** (comes with Node.js) or **yarn**
 - **MongoDB** (running locally or MongoDB Atlas connection string)
+- **Redis** (running locally on port 6379 for caching)
 - **Git**
 
 ## Installation
@@ -107,6 +108,26 @@ GOOGLE_GENAI_API_KEY=your-genai-api-key
 - For local MongoDB, use the `mongodb://localhost:27017/` format
 - Replace all placeholder values with your actual credentials
 - Never commit your `.env` file to version control
+
+### Redis Setup (Required for Caching)
+
+Caching is enabled by default to improve performance. For this to work, you must have Redis running locally.
+
+**On macOS (using Homebrew):**
+```bash
+brew install redis
+brew services start redis
+```
+
+**On Windows:**
+Download and install [Redis for Windows](https://github.com/tporadowski/redis/releases) or use WSL2.
+
+**Using Docker (Easiest):**
+```bash
+docker-compose up -d redis
+```
+
+You can check if Redis is connected by visiting `http://localhost:3001/health` or checking the **System** section in Swagger docs at `http://localhost:3001/api-docs`.
 
 ### Frontend Configuration
 

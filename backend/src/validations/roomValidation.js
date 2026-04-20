@@ -3,7 +3,7 @@ const { body } = require('express-validator');
 const validateRoom = [
   body('title').notEmpty().withMessage('Title is required'),
   body('description').notEmpty().withMessage('Description is required'),
-  body('price').isNumeric().withMessage('Price must be a number'),
+  body('price').isNumeric().withMessage('Price must be a number').custom(value => value > 0).withMessage('Price must be greater than zero'),
   body('location').notEmpty().withMessage('Location is required'),
   body('propertyType').notEmpty().withMessage('Property type is required'),
   body('capacity').isNumeric().withMessage('Capacity must be a number'),
