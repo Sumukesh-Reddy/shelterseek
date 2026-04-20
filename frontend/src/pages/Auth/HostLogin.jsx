@@ -200,7 +200,21 @@ const HostLogin = () => {
         </form>
 
         <div className="auth-footer">
-          <Link to="/traveler-login">Login as Traveler</Link>
+          {step === 1 ? (
+            <>
+              Don't have an account? <Link to="/signup" className="auth-link">Sign up</Link>
+              <br />
+              <Link to="/traveler-login" className="auth-link">Login as Traveler instead</Link>
+            </>
+          ) : (
+            <button 
+              type="button" 
+              className="auth-button secondary" 
+              onClick={() => setStep(1)}
+            >
+              Back to Login
+            </button>
+          )}
         </div>
       </div>
     </div>
