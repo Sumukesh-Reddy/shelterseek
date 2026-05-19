@@ -8,19 +8,26 @@ const initRedis = async () => {
             url: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
             socket: {
                 reconnectStrategy: (retries) => {
-                    return Math.min(retries * 50, 2000);
+                    if (retries > 30) {
+                        // Try very slowly after 30 attempts to avoid spamming
+                        return 30000; // 30 seconds
+                    }
+                    return Math.min(retries * 500, 5000); // Gradual backoff up to 5 seconds
                 }
             }
         });
 
         redisClient.on('error', (err) => {
-            if (err.code === 'ECONNREFUSED') {
+            const isConnectionError = ['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'EHOSTUNREACH'].includes(err.code) || err.message.includes('getaddrinfo');
+            if (isConnectionError) {
                 if (!redisClient.isRefused) {
-                    console.log('⚠️ Redis not found at 127.0.0.1:6379. Caching will be skipped.');
+                    console.log(`⚠️ Redis server is unavailable (${err.message}). Caching will be skipped.`);
                     redisClient.isRefused = true;
                 }
             } else {
-                console.log('Redis Cache Error: ', err.message);
+                if (!redisClient.isRefused) {
+                    console.log('Redis Cache Error: ', err.message);
+                }
             }
         });
 

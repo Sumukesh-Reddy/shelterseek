@@ -6,23 +6,7 @@ const https = require("https");
 const { Server } = require("socket.io");
 const app = require("./src/app");
 
-// Keep-Alive Function for Render.com
-// This prevents the free tier from sleeping by self-pinging every 14 mins
-const keepAlive = (url) => {
-  let i = 0;
-  setInterval(() => {
-    i = (i + 1) % 11;
-    console.log(` [Heartbeat] Render Keep-Alive: Count = ${i}`);
 
-    if (url) {
-      https.get(url, (res) => {
-        console.log(` [Keep-Alive] Self-ping status: ${res.statusCode}`);
-      }).on('error', (err) => {
-        console.error(' [Keep-Alive] Self-ping error:', err.message);
-      });
-    }
-  }, 3 * 60 * 1000); // 3 minutes (Render sleeps after 15 mins)
-};
 
 const PORT = process.env.PORT || 3001;
 
@@ -66,8 +50,7 @@ mongoose
       console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
       console.log(` Socket.IO ready at: http://localhost:${PORT}`);
 
-      // Start Keep-Alive to prevent Render sleep (if URL provided)
-      keepAlive(process.env.RENDER_EXTERNAL_URL);
+
     });
 
     // Graceful listen error handling (e.g. EADDRINUSE)

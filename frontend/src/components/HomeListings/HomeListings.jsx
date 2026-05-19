@@ -7,11 +7,20 @@ import './HomeListings.css';
 const HomeListings = ({ filters }) => {
   const [rooms, setRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showSlowServerMessage, setShowSlowServerMessage] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    let slowTimer;
     const fetchRooms = async () => {
       setIsLoading(true);
+      setShowSlowServerMessage(false);
+
+      // Set a timer to show the "please wait" message if the server takes > 3.5 seconds
+      slowTimer = setTimeout(() => {
+        setShowSlowServerMessage(true);
+      }, 3500);
+
       try {
         const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/rooms`);
         if (!response.ok) {
@@ -44,10 +53,16 @@ const HomeListings = ({ filters }) => {
         console.error('Error fetching rooms:', err);
         setError('Failed to load rooms. Please try again later.');
       } finally {
+        clearTimeout(slowTimer);
         setIsLoading(false);
+        setShowSlowServerMessage(false);
       }
     };
     fetchRooms();
+
+    return () => {
+      if (slowTimer) clearTimeout(slowTimer);
+    };
   }, []);
 
   // Apply filters to rooms
@@ -129,6 +144,15 @@ const HomeListings = ({ filters }) => {
 
   return (
     <div className="main-home-block" id="homes-container">
+      {showSlowServerMessage && (
+        <div className="server-wakeup-notice">
+          <div className="server-wakeup-icon">⏳</div>
+          <div className="server-wakeup-text">
+            <h4>Connecting to server...</h4>
+            <p>Our backend is hosted on a free plan which sleeps after 15 minutes of inactivity. It is currently waking up. Please wait a minute or two for the site to load.</p>
+          </div>
+        </div>
+      )}
       {isLoading && <SkeletonLoader />}
       {error && <div className="error-message animate-fade-in">{error}</div>}
       {filteredRooms.length === 0 && !isLoading && !error && (
