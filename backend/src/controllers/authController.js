@@ -36,7 +36,7 @@ exports.sendOTP = catchAsync(async (req, res, next) => {
       // In development, return OTP in response
       return res.json({ success: true, message: 'OTP generated (dev)', otp });
     }
-    return next(new AppError('Failed to send OTP', 500));
+    return next(new AppError(`Failed to send OTP: ${error.message}`, 500));
   }
 });
 
