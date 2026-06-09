@@ -26,6 +26,7 @@ const imageRoutes = require('./routes/imageRoutes');
 const managerRoutes = require('./routes/managerRoutes');
 const financeRoutes = require('./routes/financeRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const contactRoutes = require('./routes/contactRoutes');
 
 // Swagger setup
 const setupSwagger = require('./config/swagger');
@@ -147,6 +148,7 @@ app.use('/api/managers', managerRoutes);
 app.use('/auth/manager', managerRoutes);
 app.use("/api/finance", financeRoutes);
 app.use("/api/payment", paymentRoutes);
+app.use("/api/contact", contactRoutes);
 
 // Health check and Cache management
 /**

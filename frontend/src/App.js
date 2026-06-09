@@ -54,6 +54,7 @@ import FinanceDashboard from './pages/finance/FinanceDashboard';
 import HostRevenue from './pages/finance/HostRevenue';
 import HostFinanceDetail from './pages/finance/HostFinanceDetail';
 import FinanceManagerProfile from './pages/finance/FinanceManagerProfile';
+import Contact from './pages/Contact/Contact';
 
 function App() {
   return (
@@ -74,6 +75,7 @@ function App() {
             /> */}
             <Route path="/" element={<RoleHome />} />
             <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
             <Route path="/room/:id" element={<RoomLayout />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/loginweb" element={<LoginSelection />} />
