@@ -1,26 +1,41 @@
+const nodemailer = require('nodemailer');
 const fetch = require('node-fetch');
 
-// Resend API - uses HTTP (no SMTP port blocking on Render)
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.EMAIL_FROM || 'ShelterSeek <onboarding@resend.dev>';
+// Helper to create Nodemailer SMTP Transporter
+const createTransporter = () => {
+  const emailUser = process.env.EMAIL_USER || process.env.EMAIL;
+  
+  if (!emailUser || !process.env.EMAIL_PASS) {
+    console.warn('SMTP Email credentials not configured');
+    return null;
+  }
 
-/**
- * Send an email via Resend HTTP API
- * Works on Render (no SMTP port 465/587 required)
- */
-const sendEmail = async ({ to, subject, html }) => {
-  if (!RESEND_API_KEY) {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: emailUser, pass: process.env.EMAIL_PASS },
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 5000
+  });
+};
+
+// Send an email via Resend HTTP API (fallback / contact form)
+const sendEmailViaResend = async ({ to, subject, html }) => {
+  const apiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.EMAIL_FROM || 'ShelterSeek <onboarding@resend.dev>';
+
+  if (!apiKey) {
     throw new Error('RESEND_API_KEY not configured');
   }
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${RESEND_API_KEY}`,
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: FROM_EMAIL,
+      from: fromEmail,
       to: [to],
       subject,
       html
@@ -36,9 +51,36 @@ const sendEmail = async ({ to, subject, html }) => {
   return data;
 };
 
+// Main function to send general emails (OTP, resets, etc.)
+// Tries SMTP first (unrestricted), falls back to Resend if SMTP is blocked/fails
+const sendGeneralEmail = async ({ to, subject, html }) => {
+  const transporter = createTransporter();
+  if (transporter) {
+    try {
+      console.log(`Attempting SMTP delivery to ${to}...`);
+      await transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to,
+        subject,
+        html
+      });
+      console.log(`SMTP delivery succeeded to ${to}`);
+      return { success: true, method: 'smtp' };
+    } catch (smtpErr) {
+      console.warn(`SMTP delivery failed to ${to}: ${smtpErr.message}. Trying Resend...`);
+    }
+  }
+
+  // Fallback to Resend (works on Render free tier, but limited to owner on free Resend account)
+  console.log(`Attempting Resend delivery to ${to}...`);
+  await sendEmailViaResend({ to, subject, html });
+  console.log(`Resend delivery succeeded to ${to}`);
+  return { success: true, method: 'resend' };
+};
+
 // Send OTP email
 const sendOTPEmail = async (toEmail, otp) => {
-  await sendEmail({
+  await sendGeneralEmail({
     to: toEmail,
     subject: '🔐 Your ShelterSeek Verification Code',
     html: `
@@ -112,7 +154,7 @@ const sendBookingConfirmationEmail = async (toEmail, bookingDetails) => {
   };
 
   try {
-    await sendEmail({
+    await sendGeneralEmail({
       to: toEmail,
       subject: 'Booking Confirmation - ShelterSeek',
       html: `
@@ -183,7 +225,6 @@ const sendBookingConfirmationEmail = async (toEmail, bookingDetails) => {
     });
   } catch (err) {
     console.warn('Booking confirmation email failed:', err.message);
-    // Don't throw — booking should still succeed even if email fails
   }
 };
 
@@ -192,7 +233,7 @@ const sendTestEmail = async (toEmail) => {
   const testOtp = Math.floor(100000 + Math.random() * 900000).toString();
   
   try {
-    await sendEmail({
+    await sendGeneralEmail({
       to: toEmail,
       subject: 'Test OTP Email - ShelterSeek Working!',
       html: `<p>Your test OTP is: <strong>${testOtp}</strong></p>`
@@ -212,7 +253,7 @@ const sendManagerWelcomeEmail = async (toEmail, details = {}) => {
   const managerPassword = details.password || '';
 
   try {
-    await sendEmail({
+    await sendGeneralEmail({
       to: toEmail,
       subject: 'Welcome to ShelterSeek - Manager Access',
       html: `
@@ -271,7 +312,7 @@ const sendManagerWelcomeEmail = async (toEmail, details = {}) => {
 };
 
 const sendPasswordResetEmail = async (toEmail, resetLink) => {
-  await sendEmail({
+  await sendGeneralEmail({
     to: toEmail,
     subject: '🔑 Reset Your ShelterSeek Password',
     html: `

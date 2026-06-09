@@ -151,7 +151,7 @@ router.post('/', contactUpload.single('attachment'), async (req, res) => {
       </div>
     `;
 
-    const resendRes = await fetch('https://api.resend.com/emails', {
+    let resendRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
@@ -166,10 +166,35 @@ router.post('/', contactUpload.single('attachment'), async (req, res) => {
       })
     });
 
-    const resendData = await resendRes.json();
+    let resendData = await resendRes.json();
     if (!resendRes.ok) {
-      console.error('Resend error:', resendData);
-      return res.status(500).json({ success: false, message: 'Failed to send email. Please try again.' });
+      console.warn('Primary email sending to shelterseekrooms@gmail.com failed, trying fallback to sumukeshmopuram1@gmail.com. Error details:', resendData);
+      
+      // Attempt to send to sumukeshmopuram1@gmail.com (Resend free plan owner)
+      const fallbackRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: process.env.EMAIL_FROM || 'ShelterSeek <onboarding@resend.dev>',
+          to: ['sumukeshmopuram1@gmail.com'],
+          reply_to: email,
+          subject: `[Contact Fallback] ${reason}${subject ? ` — ${subject}` : ''} | From ${name}`,
+          html: `
+            ${emailHtml}
+          `
+        })
+      });
+
+      const fallbackData = await fallbackRes.json();
+      if (!fallbackRes.ok) {
+        console.error('Fallback email sending to sumukeshmopuram1@gmail.com also failed:', fallbackData);
+        return res.status(500).json({ success: false, message: 'Failed to send email. Please try again.' });
+      }
+      
+      resendData = fallbackData;
     }
 
     // Send acknowledgement to the user

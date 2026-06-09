@@ -309,3 +309,4 @@
 ::ffff:159.41.199.75 - - [20/Apr/2026:19:17:55 +0000] "GET /api/bookings/stats HTTP/1.1" 200 197 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Safari/605.1.15"
 ::ffff:159.41.199.75 - - [20/Apr/2026:19:17:56 +0000] "GET /api/rooms/count HTTP/1.1" 200 395 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Safari/605.1.15"
 ::ffff:159.41.199.75 - - [20/Apr/2026:19:17:56 +0000] "GET /api/admin/recent-activities HTTP/1.1" 200 2426 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Safari/605.1.15"
+::1 - - [09/Jun/2026:17:08:41 +0000] "POST /api/contact HTTP/1.1" 200 83 "-" "node"
