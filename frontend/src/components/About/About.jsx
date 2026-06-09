@@ -1,236 +1,266 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  FaBullseye, 
-  FaEye, 
-  FaLinkedin, 
-  FaGithub, 
-  FaEnvelope,
-} from 'react-icons/fa';
+import React, { useEffect, useState, useRef } from 'react';
 import './About.css';
 
 const About = () => {
   const [travelerCount, setTravelerCount] = useState(0);
   const [hostCount, setHostCount] = useState(0);
+  const [listingCount, setListingCount] = useState(0);
+  const statsRef = useRef(null);
+  const [statsVisible, setStatsVisible] = useState(false);
 
   useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setStatsVisible(true); },
+      { threshold: 0.3 }
+    );
+    if (statsRef.current) observer.observe(statsRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!statsVisible) return;
+
     const fetchUserCounts = async () => {
       try {
         const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/users/counts`);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
+        if (!response.ok) throw new Error();
         const data = await response.json();
-        console.log('User counts data:', data); // Debug log
-        
         if (data.success) {
-          animateCount(data.travelerCount, setTravelerCount);
-          animateCount(data.hostCount, setHostCount);
+          animateCount(data.travelerCount || 10000, setTravelerCount);
+          animateCount(data.hostCount || 5000, setHostCount);
+          animateCount((data.travelerCount || 10000) + (data.hostCount || 5000), setListingCount);
         } else {
-          console.warn('API returned success: false, using fallback numbers');
-          setTravelerCount(10000);
-          setHostCount(5000);
+          animateCount(10000, setTravelerCount);
+          animateCount(5000, setHostCount);
+          animateCount(15000, setListingCount);
         }
-      } catch (error) {
-        console.error('Error fetching user counts:', error);
-        // Use fallback numbers
-        setTravelerCount(10000);
-        setHostCount(5000);
+      } catch {
+        animateCount(10000, setTravelerCount);
+        animateCount(5000, setHostCount);
+        animateCount(15000, setListingCount);
       }
     };
 
-    const animateCount = (targetNumber, setter) => {
+    const animateCount = (target, setter) => {
       const duration = 2000;
-      const frameRate = 30;
-      const totalFrames = duration / (1000 / frameRate);
-      const increment = targetNumber / totalFrames;
-      let currentNumber = 0;
-      
+      const frames = 60;
+      const increment = target / frames;
+      let current = 0;
       const timer = setInterval(() => {
-        currentNumber += increment;
-        if (currentNumber >= targetNumber) {
-          clearInterval(timer);
-          currentNumber = targetNumber;
-        }
-        setter(Math.round(currentNumber));
-      }, 1000 / frameRate);
+        current += increment;
+        if (current >= target) { clearInterval(timer); current = target; }
+        setter(Math.round(current));
+      }, duration / frames);
     };
 
     fetchUserCounts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [statsVisible]);
+
+  const values = [
+    {
+      icon: '🔒',
+      title: 'Trust & Safety',
+      desc: 'Every listing is verified. Every transaction is secured. Your safety is built into every step of the journey.'
+    },
+    {
+      icon: '🌍',
+      title: 'Authentic Stays',
+      desc: 'Discover accommodations that reflect real local character — from boutique guesthouses to modern city apartments.'
+    },
+    {
+      icon: '💸',
+      title: 'Fair Pricing',
+      desc: 'Transparent pricing with no hidden fees. What you see is what you pay, always.'
+    },
+    {
+      icon: '⚡',
+      title: 'Instant Booking',
+      desc: 'Book in seconds with real-time availability. No waiting, no back-and-forth — just seamless reservations.'
+    },
+    {
+      icon: '🤝',
+      title: 'Host Support',
+      desc: 'We empower hosts with tools, analytics, and 24/7 support to help them deliver outstanding guest experiences.'
+    },
+    {
+      icon: '♻️',
+      title: 'Sustainable Travel',
+      desc: 'We promote eco-friendly stays and responsible tourism to protect the destinations we all love.'
+    }
+  ];
+
+  const features = [
+    { icon: '🗺️', label: 'Smart Search' },
+    { icon: '📅', label: 'Easy Booking' },
+    { icon: '💬', label: 'AI Chatbot' },
+    { icon: '🔔', label: 'Instant Alerts' },
+    { icon: '🏠', label: 'Host Dashboard' },
+    { icon: '📊', label: 'Analytics' },
+    { icon: '🔐', label: 'Secure Payments' },
+    { icon: '⭐', label: 'Verified Reviews' },
+  ];
 
   return (
-    <div className="about-page">
-      <header className="about-header">
-        <h1>About ShelterSeek</h1>
-        <p>Connecting travelers with unique accommodations and creating memorable experiences worldwide</p>
-      </header>
-      
-      <div className="container">
-        <section className="about-section">
-          <h2>Our Story</h2>
-          <p>
-            ShelterSeek was founded in 2025 with a simple mission: to make travel accommodation more accessible, 
-            affordable, and authentic. What began as a small project among travel enthusiasts has grown into 
-            a trusted platform connecting thousands of travelers with unique places to stay around the world.
+    <div className="ab-page">
+      {/* Hero */}
+      <section className="ab-hero">
+        <div className="ab-hero-glow" />
+        <div className="ab-hero-content">
+          <span className="ab-badge">Est. 2025</span>
+          <h1 className="ab-hero-title">Redefining How<br />India Finds a Stay</h1>
+          <p className="ab-hero-sub">
+            ShelterSeek is a modern accommodation platform built to connect travelers with verified, 
+            quality stays across India — fast, transparent, and hassle-free.
           </p>
-          <p>
-            We believe that where you stay should be more than just a place to sleep—it should be an integral 
-            part of your travel experience. Our platform showcases everything from cozy apartments and 
-            boutique hotels to unique stays like treehouses and houseboats, all carefully vetted to ensure 
-            quality and authenticity.
-          </p>
-        </section>
-        
-        <div className="mission-vision">
-          <div className="mission">
-            <h3><FaBullseye /> Our Mission</h3>
-            <p>
-              To revolutionize the way people find accommodations by providing a platform that offers 
-              transparency, diversity, and personalized options for every type of traveler, while 
-              supporting local hosts and sustainable tourism practices.
-            </p>
-          </div>
-          
-          <div className="vision">
-            <h3><FaEye /> Our Vision</h3>
-            <p>
-              We envision a world where travel accommodation is seamless, where every stay enhances 
-              the journey, and where hosts and travelers form meaningful connections that transcend 
-              traditional hospitality.
-            </p>
+          <div className="ab-hero-actions">
+            <a href="/" className="ab-btn-primary">Explore Listings</a>
+            <a href="/contact" className="ab-btn-ghost">Get in Touch</a>
           </div>
         </div>
-        
-        <section className="stats-section" style={{ 
-          background: 'linear-gradient(90deg, #d72d6e, #7c3aed)',
-          borderRadius: '20px',
-          margin: '40px 0',
-          padding: '40px 20px',
-          color: 'white',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
-        }}>
-          <div className="stats-container" style={{ 
-            display: 'flex', 
-            justifyContent: 'space-around', 
-            flexWrap: 'wrap',
-            gap: '20px'
-          }}>
-            <div className="stat-item" style={{ textAlign: 'center', flex: '1', minWidth: '150px' }}>
-              <div className="stat-number" style={{ fontSize: '3.5rem', fontWeight: '900', marginBottom: '5px' }}>
-                {travelerCount.toLocaleString()}+
-              </div>
-              <div className="stat-label" style={{ fontSize: '1.2rem', fontWeight: '600', opacity: '0.9' }}>
-                Happy Travelers
-              </div>
+        <div className="ab-hero-visual">
+          <div className="ab-float-card ab-fc1">
+            <span className="ab-fc-icon">🏠</span>
+            <div>
+              <div className="ab-fc-label">Verified Listing</div>
+              <div className="ab-fc-val">Cozy Studio · Hyderabad</div>
             </div>
-            <div className="stat-item" style={{ textAlign: 'center', flex: '1', minWidth: '150px' }}>
-              <div className="stat-number" style={{ fontSize: '3.5rem', fontWeight: '900', marginBottom: '5px' }}>
-                {hostCount.toLocaleString()}+
-              </div>
-              <div className="stat-label" style={{ fontSize: '1.2rem', fontWeight: '600', opacity: '0.9' }}>
-                Verified Hosts
-              </div>
+          </div>
+          <div className="ab-float-card ab-fc2">
+            <span className="ab-fc-icon">⭐</span>
+            <div>
+              <div className="ab-fc-label">Guest Rating</div>
+              <div className="ab-fc-val">4.9 / 5.0 Excellent</div>
             </div>
-            <div className="stat-item" style={{ textAlign: 'center', flex: '1', minWidth: '150px' }}>
-              <div className="stat-number" style={{ fontSize: '3.5rem', fontWeight: '900', marginBottom: '5px' }}>1+</div>
-              <div className="stat-label" style={{ fontSize: '1.2rem', fontWeight: '600', opacity: '0.9' }}>
-                Countries
-              </div>
+          </div>
+          <div className="ab-float-card ab-fc3">
+            <span className="ab-fc-icon">🔒</span>
+            <div>
+              <div className="ab-fc-label">Booking Secured</div>
+              <div className="ab-fc-val">Payment Protected</div>
             </div>
-            <div className="stat-item" style={{ textAlign: 'center', flex: '1', minWidth: '150px' }}>
-              <div className="stat-number" style={{ fontSize: '3.5rem', fontWeight: '900', marginBottom: '5px' }}>24/7</div>
-              <div className="stat-label" style={{ fontSize: '1.2rem', fontWeight: '600', opacity: '0.9' }}>
-                Support
-              </div>
+          </div>
+          <div className="ab-hero-orb" />
+        </div>
+      </section>
+
+      {/* Stats */}
+      <section className="ab-stats" ref={statsRef}>
+        <div className="ab-stats-inner">
+          {[
+            { num: travelerCount.toLocaleString() + '+', label: 'Happy Travelers' },
+            { num: hostCount.toLocaleString() + '+', label: 'Verified Hosts' },
+            { num: listingCount.toLocaleString() + '+', label: 'Total Users' },
+            { num: '24/7', label: 'Customer Support' },
+          ].map((s, i) => (
+            <div className="ab-stat" key={i}>
+              <div className="ab-stat-num">{s.num}</div>
+              <div className="ab-stat-lbl">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="ab-container">
+
+        {/* Our Story */}
+        <section className="ab-story">
+          <div className="ab-story-text">
+            <div className="ab-section-tag">Our Story</div>
+            <h2>Built by travelers,<br />for travelers</h2>
+            <p>
+              ShelterSeek was born out of a frustration shared by many — finding trustworthy, affordable 
+              accommodation without spending hours comparing sites, worrying about scams, or dealing 
+              with hidden charges.
+            </p>
+            <p>
+              We built a platform that puts the traveler first. Clean listings, honest pricing, instant 
+              booking, and real reviews — all in one place. Whether you're a student looking for 
+              affordable PGs, a professional on a work trip, or a family planning a holiday, 
+              ShelterSeek has something for you.
+            </p>
+            <div className="ab-story-pills">
+              <span>✈️ Launched 2025</span>
+              <span>🇮🇳 Made in India</span>
+              <span>🏠 PGs, Hostels & More</span>
+            </div>
+          </div>
+          <div className="ab-story-cards">
+            <div className="ab-scard">
+              <div className="ab-scard-icon">🎯</div>
+              <h4>Our Mission</h4>
+              <p>Make quality accommodation accessible to every traveler in India — with transparency, speed, and zero compromise on trust.</p>
+            </div>
+            <div className="ab-scard ab-scard-offset">
+              <div className="ab-scard-icon">🔭</div>
+              <h4>Our Vision</h4>
+              <p>To become India's most trusted accommodation platform where every stay becomes a memorable part of the journey.</p>
             </div>
           </div>
         </section>
 
-        <section className="team-section">
-          <h2>Meet Our Team</h2>
-        
-          <div className="team-members">
-            <div className="team-member">
-              <img src="/images/sumukesh1.jpg" alt="M. Sumukesh Reddy" />
-              <h3>M. Sumukesh Reddy</h3>
-              <p className="role">Traveller Experience Lead</p>
-              <p className="bio">
-                Travel enthusiast with a passion for creating seamless booking experiences. 
-                Ensures our traveler interface is intuitive and feature-rich.
-              </p>
-              <div className="social-links">
-                <a href="https://www.linkedin.com/in/sumukesh-reddy-mopuram/" target="_blank" rel="noopener noreferrer"><FaLinkedin /></a>
-                <a href="https://github.com/Sumukesh-Reddy" target="_blank" rel="noopener noreferrer"><FaGithub /></a>
-                <a href="https://sumukesh-portfolio.vercel.app" target="_blank" rel="noopener noreferrer"><FaEnvelope /></a>
+        {/* Platform Features */}
+        <section className="ab-features-section">
+          <div className="ab-section-tag center">Platform</div>
+          <h2 className="ab-section-title">Everything you need,<br />in one platform</h2>
+          <div className="ab-features-grid">
+            {features.map((f, i) => (
+              <div className="ab-feature-chip" key={i}>
+                <span className="ab-feature-icon">{f.icon}</span>
+                <span>{f.label}</span>
               </div>
-            </div>
-            
-            <div className="team-member">
-              <img src="/images/jhansi.jpg" alt="G. Jhansi" />
-              <h3>G. Jhansi</h3>
-              <p className="role">Host Relations Manager</p>
-              <p className="bio">
-                Hospitality expert who works closely with our hosts to maintain quality standards 
-                and optimize their listings for maximum visibility.
-              </p>
-              <div className="social-links">
-                <a href="https://www.linkedin.com/in/jhansi-gudelli-094543315/" target="_blank" rel="noopener noreferrer"><FaLinkedin /></a>
-                <a href="https://github.com/jhansi-19" target="_blank" rel="noopener noreferrer"><FaGithub /></a>
-              </div>
-            </div>
+            ))}
+          </div>
+        </section>
 
-            <div className="team-member">
-              <img src="/images/chinnu.jpg" alt="C. Prudhvi" />
-              <h3>C. Prudhvi</h3>
-              <p className="role">Administrative Systems</p>
-              <p className="bio">
-                Backend wizard who keeps our platform running smoothly and implements 
-                new features to enhance functionality.
-              </p>
-              <div className="social-links">
-                <a href="https://www.linkedin.com/in/prudhvi-natha-reddy-67222a29b/" target="_blank" rel="noopener noreferrer"><FaLinkedin /></a>
-                <a href="https://github.com/prudhvi-natha-reddy" target="_blank" rel="noopener noreferrer"><FaGithub /></a>
+        {/* Values */}
+        <section className="ab-values-section">
+          <div className="ab-section-tag center">What We Stand For</div>
+          <h2 className="ab-section-title">Our Core Values</h2>
+          <div className="ab-values-grid">
+            {values.map((v, i) => (
+              <div className="ab-value-card" key={i}>
+                <div className="ab-value-icon">{v.icon}</div>
+                <h4>{v.title}</h4>
+                <p>{v.desc}</p>
               </div>
-            </div>
+            ))}
+          </div>
+        </section>
 
-            <div className="team-member">
-              <img src="/images/jash.jpg" alt="M. Jashwanth" />
-              <h3>M. Jashwanth</h3>
-              <p className="role">Administrative Systems</p>
-              <p className="bio">
-                Focuses on system security and data integrity to ensure our users' information 
-                is always protected.
-              </p>
-              <div className="social-links">
-                <a href="https://www.linkedin.com/in/jaswanth-medisetti-830478318/" target="_blank" rel="noopener noreferrer"><FaLinkedin /></a>
-                <a href="https://github.com/Jaswanth-m25" target="_blank" rel="noopener noreferrer"><FaGithub /></a>
+        {/* How It Works */}
+        <section className="ab-how">
+          <div className="ab-section-tag center">Simple Process</div>
+          <h2 className="ab-section-title">How ShelterSeek Works</h2>
+          <div className="ab-steps">
+            {[
+              { step: '01', icon: '🔍', title: 'Search', desc: 'Enter your destination and dates to browse verified listings instantly.' },
+              { step: '02', icon: '📋', title: 'Choose', desc: 'Filter by price, amenities, and ratings to find your perfect match.' },
+              { step: '03', icon: '🔐', title: 'Book', desc: 'Book instantly with our secure payment gateway — no calls, no hassle.' },
+              { step: '04', icon: '🏠', title: 'Stay', desc: 'Check in and enjoy your stay, backed by our 24/7 customer support.' },
+            ].map((s, i) => (
+              <div className="ab-step" key={i}>
+                <div className="ab-step-num">{s.step}</div>
+                <div className="ab-step-icon">{s.icon}</div>
+                <h4>{s.title}</h4>
+                <p>{s.desc}</p>
+                {i < 3 && <div className="ab-step-arrow">→</div>}
               </div>
-            </div>
-            
-            <div className="team-member">
-              <img src="/images/sai.jpg" alt="A. Venkata Sai" />
-              <h3>A. Venkata Sai</h3>
-              <p className="role">User Data Specialist</p>
-              <p className="bio">
-                Manages user profiles and host details, ensuring accurate information 
-                while maintaining strict privacy standards.
-              </p>
-              <div className="social-links">
-                <a href="https://www.linkedin.com/in/venkata-sai-reddy-anipireddy-a73b742a3/" target="_blank" rel="noopener noreferrer"><FaLinkedin /></a>
-                <a href="https://github.com/venkatasai0604" target="_blank" rel="noopener noreferrer"><FaGithub /></a>
-              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section className="ab-cta">
+          <div className="ab-cta-inner">
+            <h2>Ready to find your perfect stay?</h2>
+            <p>Join thousands of travelers discovering unique, verified accommodations across India.</p>
+            <div className="ab-cta-actions">
+              <a href="/" className="ab-btn-primary">Browse Listings</a>
+              <a href="/signup" className="ab-btn-ghost-dark">Create Free Account</a>
             </div>
           </div>
         </section>
-        
-        <section className="cta-section">
-          <h2>Ready to Find Your Perfect Stay?</h2>
-          <p>Join thousands of travelers discovering unique accommodations around the world</p>
-          <a href="/" className="cta-button">Explore Listings</a>
-        </section>
+
       </div>
     </div>
   );
