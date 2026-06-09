@@ -11,7 +11,10 @@ const createTransporter = () => {
 
   return nodemailer.createTransport({
     service: 'gmail',
-    auth: { user: emailUser, pass: process.env.EMAIL_PASS }
+    auth: { user: emailUser, pass: process.env.EMAIL_PASS },
+    connectionTimeout: 5000, // 5 seconds connection timeout
+    greetingTimeout: 5000,   // 5 seconds greeting timeout
+    socketTimeout: 5000      // 5 seconds socket inactivity timeout
   });
 };
 
