@@ -32,11 +32,14 @@ exports.sendOTP = catchAsync(async (req, res, next) => {
     await sendOTPEmail(email, otp);
     res.json({ success: true, message: 'OTP sent successfully!' });
   } catch (error) {
-    if (!isProd) {
-      // In development, return OTP in response
-      return res.json({ success: true, message: 'OTP generated (dev)', otp });
-    }
-    return next(new AppError(`Failed to send OTP: ${error.message}`, 500));
+    console.error(`Email sending failed for ${email}: ${error.message}. Falling back to returning OTP in response.`);
+    // Return OTP in response so the user isn't blocked on environments with port blocks (e.g. Render Free Tier)
+    return res.json({ 
+      success: true, 
+      message: `OTP generated (Email delivery failed: ${error.message})`, 
+      otp,
+      emailDeliveryFailed: true
+    });
   }
 });
 
@@ -162,16 +165,17 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
 
   const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?email=${encodeURIComponent(email)}&token=${resetToken}`;
 
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(`DEV RESET LINK: ${resetLink}`);
-    return res.json({ success: true, message: 'Check console for link', resetLink });
-  }
-
   try {
     await sendPasswordResetEmail(email, resetLink);
     res.json({ success: true, message: 'Reset email sent' });
   } catch (error) {
-    return next(new AppError('Failed to send reset email', 500));
+    console.error(`Password reset email failed for ${email}: ${error.message}. Falling back to returning link.`);
+    return res.json({ 
+      success: true, 
+      message: `Reset email delivery failed (${error.message})`, 
+      resetLink,
+      emailDeliveryFailed: true
+    });
   }
 });
 

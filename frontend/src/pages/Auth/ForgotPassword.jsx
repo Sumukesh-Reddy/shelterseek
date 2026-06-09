@@ -9,11 +9,13 @@ const ForgotPassword = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [resetLink, setResetLink] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+    setResetLink('');
     setLoading(true);
 
     try {
@@ -29,12 +31,16 @@ const ForgotPassword = () => {
         throw new Error(data.message || 'Failed to send reset email');
       }
 
-      setSuccess('Password reset instructions sent to your email!');
-      
-      // Redirect to login after 3 seconds
-      setTimeout(() => {
-        navigate('/');
-      }, 3000);
+      if (data.emailDeliveryFailed && data.resetLink) {
+        setSuccess('Email delivery failed (SMTP block). Use the link below to reset your password:');
+        setResetLink(data.resetLink);
+      } else {
+        setSuccess('Password reset instructions sent to your email!');
+        // Redirect to login after 3 seconds
+        setTimeout(() => {
+          navigate('/');
+        }, 3000);
+      }
       
     } catch (err) {
       setError(err.message);
@@ -54,7 +60,18 @@ const ForgotPassword = () => {
         </div>
 
         {error && <div className="error-message">{error}</div>}
-        {success && <div className="success-message">{success}</div>}
+        {success && (
+          <div className="success-message">
+            {success}
+            {resetLink && (
+              <div style={{ marginTop: '10px' }}>
+                <a href={resetLink} style={{ color: '#d72d6e', fontWeight: 'bold', textDecoration: 'underline' }}>
+                  Reset Password Now
+                </a>
+              </div>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">

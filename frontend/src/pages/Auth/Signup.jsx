@@ -68,7 +68,12 @@ const Signup = () => {
       if (!res.ok) {
         throw new Error(data.error || 'Failed to send OTP');
       }
-      setSuccess('OTP sent to your email!');
+      if (data.emailDeliveryFailed && data.otp) {
+        setSuccess(`OTP generated: ${data.otp} (Email delivery failed, using fallback)`);
+        setOtp(data.otp.split(''));
+      } else {
+        setSuccess('OTP sent to your email!');
+      }
       setResendTimer(60);
       setStep(2);
     } catch (err) {
